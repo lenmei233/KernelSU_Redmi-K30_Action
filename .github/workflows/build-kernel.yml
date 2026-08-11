@@ -8,11 +8,11 @@ on:
       KERNEL_SOURCE:
         description: 'Kernel Source'
         required: true
-        default: 'https://github.com/redcliff-op/android_kernel_xiaomi_phoenix'
+        default: 'https://github.com/lenmei233/kernel_xiaomi_sm7250'
       KERNEL_SOURCE_BRANCH:
         description: 'Branch'
         required: true
-        default: 'R'
+        default: 'android-4.19'
       KERNEL_DEFCONFIG:
         description: 'Defconfig'
         required: true
@@ -32,7 +32,7 @@ on:
       DISABLE-LTO:
         description: 'Disable LTO'
         required: false
-        default: 'false'
+        default: 'true'
         type: boolean
       USE_KERNELSU:
         description: 'Use KernelSU'
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.repository.owner.id == github.event.sender.id
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup Configuration
       run: |
         if [ $(cat config.env | grep "USE_CONFIG" | head -n 1 | cut -d "=" -f 2) = true ];then
