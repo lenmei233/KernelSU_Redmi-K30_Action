@@ -51,18 +51,20 @@ jobs:
     if: github.event.repository.owner.id == github.event.sender.id
     steps:
     - uses: actions/checkout@v4
+    
     - name: Setup Configuration
       run: |
-        if [ $(cat config.env | grep "USE_CONFIG" | head -n 1 | cut -d "=" -f 2) = true ];then
-            echo "KERNEL_SOURCE=$(cat config.env | grep "KERNEL_SOURCE" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "KERNEL_SOURCE_BRANCH=$(cat config.env | grep "KERNEL_SOURCE_BRANCH" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "KERNEL_DEFCONFIG=$(cat config.env | grep "KERNEL_DEFCONFIG" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "KERNEL_FILE=$(cat config.env | grep "KERNEL_FILE" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "CLANG_VERSION=$(cat config.env | grep "CLANG_VERSION" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "BUILD_EXTRA_COMMAND=$(cat config.env | grep "EXTRA_BUILD_COMMAND" | head -n 1 | cut -d ":" -f 2)" >> $GITHUB_ENV
-            echo "DISABLE-LTO=$(cat config.env | grep "DISABLE-LTO" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "USE_KERNELSU=$(cat config.env | grep "USE_KERNELSU" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
-            echo "USE_KPROBES=$(cat config.env | grep "USE_KPROBES" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
+        if [ "$(grep 'USE_CONFIG' config.env | head -n1 | cut -d'=' -f2)" = "true" ]; then
+            echo "KERNEL_SOURCE=$(grep 'KERNEL_SOURCE' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "KERNEL_SOURCE_BRANCH=$(grep 'KERNEL_SOURCE_BRANCH' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "KERNEL_DEFCONFIG=$(grep 'KERNEL_DEFCONFIG' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "KERNEL_FILE=$(grep 'KERNEL_FILE' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "CLANG_VERSION=$(grep 'CLANG_VERSION' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            # 修复变量名：EXTRA_CMDS → EXTRA_BUILD_COMMAND
+            echo "BUILD_EXTRA_COMMAND=$(grep 'EXTRA_CMDS' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "DISABLE-LTO=$(grep 'DISABLE-LTO' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "USE_KERNELSU=$(grep 'USE_KERNELSU' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
+            echo "USE_KPROBES=$(grep 'USE_KPROBES' config.env | head -n1 | cut -d'=' -f2)" >> $GITHUB_ENV
         else
             echo "KERNEL_SOURCE=${{ github.event.inputs.KERNEL_SOURCE }}" >> $GITHUB_ENV
             echo "KERNEL_SOURCE_BRANCH=${{ github.event.inputs.KERNEL_SOURCE_BRANCH }}" >> $GITHUB_ENV
@@ -79,8 +81,20 @@ jobs:
       run: |
         echo "BUILD_TIME=$(TZ=Asia/Shanghai date "+%Y%m%d%H%M")" >> $GITHUB_ENV
         echo "DEVICE=$(echo ${{ env.KERNEL_DEFCONFIG }} | sed 's!vendor/!!;s/_defconfig//;s/_user//;s/-perf//')" >> $GITHUB_ENV
+        sudo dpkg --add-architecture i386
         sudo apt-get update
-        sudo apt-get install git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python3
+        sudo apt-get install -y \
+          git ccache automake flex lzop bison gperf build-essential \
+          zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 \
+          libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools \
+          pngcrush schedtool dpkg-dev liblz4-tool make optipng maven \
+          libssl-dev pwgen libswitch-perl policycoreutils minicom \
+          libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 \
+          lib32ncurses-dev libx11-dev lib32z1-dev libgl1-mesa-dev \
+          xsltproc unzip device-tree-compiler python3 \
+          gcc-multilib g++-multilib
+        # 软链接 python3 为 python（兼容老脚本）
+        sudo ln -sf /usr/bin/python3 /usr/bin/python
 
     - name: Download Clang-aosp and Gcc-aosp
       run: |
@@ -102,13 +116,13 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
-        if [ ${{ env.USE_KPROBES }} = true ]; then
+        if [ "${{ env.USE_KPROBES }}" = "true" ]; then
             echo "CONFIG_MODULES=y" >> arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
             echo "CONFIG_KPROBES=y" >> arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
             echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
             echo "CONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
         fi
-        if [ ${{ env.DISABLE-LTO }} = true ]; then
+        if [ "${{ env.DISABLE-LTO }}" = "true" ]; then
             sed -i 's/CONFIG_LTO=y/CONFIG_LTO=n/' arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
             sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_CLANG=n/' arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
             sed -i 's/CONFIG_THINLTO=y/CONFIG_THINLTO=n/' arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
@@ -121,8 +135,17 @@ jobs:
         export PATH=$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$PATH
         export KBUILD_BUILD_HOST=Github-Action
         export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
-        make -j$(nproc --all) O=out ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=$GITHUB_WORKSPACE/kernel_workspace/gcc-aosp/bin/aarch64-linux-android- CC=clang ${{ env.BUILD_EXTRA_COMMAND }} ${{ env.KERNEL_DEFCONFIG }}
-        make -j$(nproc --all) O=out ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=$GITHUB_WORKSPACE/kernel_workspace/gcc-aosp/bin/aarch64-linux-android- CC=clang ${{ env.BUILD_EXTRA_COMMAND }}
+        make -j$(nproc --all) O=out ARCH=arm64 \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=$GITHUB_WORKSPACE/kernel_workspace/gcc-aosp/bin/aarch64-linux-android- \
+          CC=clang \
+          ${{ env.BUILD_EXTRA_COMMAND }} \
+          ${{ env.KERNEL_DEFCONFIG }}
+        make -j$(nproc --all) O=out ARCH=arm64 \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=$GITHUB_WORKSPACE/kernel_workspace/gcc-aosp/bin/aarch64-linux-android- \
+          CC=clang \
+          ${{ env.BUILD_EXTRA_COMMAND }}
 
     - name: Make Anykernel for your kernel
       run: |
